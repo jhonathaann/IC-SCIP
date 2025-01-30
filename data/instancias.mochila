@@ -1,0 +1,17 @@
+quant itens  quant mochilas
+capacidade da mochila 1
+capacidade da mochila 2
+capacidade da mochila 3
+.
+.
+.
+.
+capacidade da mochila n
+rotulo do iten 1    peso do item 1  valor do item 1
+.
+.
+.
+rotulo do iten m    peso do item m  valor do item m  
+
+n = quant itens
+m = quant mochilas
