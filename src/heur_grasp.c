@@ -123,6 +123,7 @@ SCIP_DECL_HEUREXITSOL(heurExitsolGrasp)
    return SCIP_OKAY;
 }
 
+void min_max(itemType *candidatos, int i, int n, int *max, int *min);  // funcao para achar o maximo e o minimo  da lista de candidatos
 
 /**
  * @brief Core of the grasp heuristic: it builds one solution for the problem by grasp procedure.
@@ -146,7 +147,8 @@ int grasp(SCIP* scip, SCIP_SOL** sol, SCIP_HEUR* heur)
    instanceT* I;
 
 
-   int max_iteracoes, *candidatos;
+   int max_iteracoes = 10, maximo, minimo;
+   itemType *candidatos;
    
    found = 0;
    infeasible = 0;
@@ -199,19 +201,30 @@ int grasp(SCIP* scip, SCIP_SOL** sol, SCIP_HEUR* heur)
     */
 
    // alocando o vetor de candidatos
-   candidatos = (int *) (malloc(n * sizeof(int)));
+   candidatos = (itemType*) malloc(sizeof(itemType)*I->n);
 
     for( i = 0; i < max_iteracoes; i++){
 
       // colocando no vetor candidatos todos os itens que tem peso <= capacidade da mochila i
       for(int j = 0; j < I->n; j++){
-         if(I->item[i].weight <= I->C[i]){
-            candidatos[i] = 
+         if(I->item[j].weight <= I->C[i]){
+            candidatos[j] = I->item[j];  // assim?
          }
       }
 
-      while(I->C[i] > 1.0 && ){
+      int  capacidade_atual = I->C[i];
+      int quant_tens =  I->n;
 
+      while(capacidade_atual < 0.0 && quant_tens >= 1){
+
+         // maximo e o minimo de candidatos[i];
+         min_max(candidatos, i, n, *maximo, *minimo);
+
+         // cria a RCL
+
+         // escolhe um item aleatorio da RCL
+         quant_tens--;
+         capacidade_atual -= candidatos[posicao_tem_escolhdo].weight;
 
       }
 
@@ -420,3 +433,18 @@ SCIP_RETCODE SCIPincludeHeurGrasp(
    return SCIP_OKAY;
 }
 
+void min_max(itemType *candidatos, int i, int n, int *max, int *min){
+   max = candidatos[i].item[0].value;
+   max = candidatos[i].item[0].value;
+
+   for(int j = 1; i < n; j++){
+      if(candidatos[i].item[j].value > *max){
+         max = candidatos[i].item[j].value;
+      }
+
+       if(candidatos[i].item[j].value < *min){
+         max = candidatos[i].item[j].value;
+      }
+   }
+
+}
