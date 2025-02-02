@@ -17,6 +17,7 @@ typedef struct{
    int heur_round_maxdepth;
    int heur_round_freqofs;
    int heur_aleatoria;
+   int heur_grasp;   // eu que add isso. n sei se eh assim que funciona
 } parametersT;
 
 int setParameters(int argc, char** argv, parametersT* Param);
