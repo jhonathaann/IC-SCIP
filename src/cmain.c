@@ -457,6 +457,7 @@ int main(int argc, char **argv)
   instanceT* in;
   clock_t start, end;
   char outputname[SCIP_MAXSTRLEN];
+  srand(time(NULL));  // semente para o numero aleatorio
 
   // set default+user parameters
   if(!setParameters(argc, argv, &param))
