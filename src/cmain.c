@@ -37,6 +37,8 @@
 #include "parameters_mochila.h"
 #include "heur_myrounding.h"
 #include "heur_aleatoria.h"
+#include "heur_grasp.h"
+
 const char* output_path;
 const char* current_path = ".";
 //
@@ -98,6 +100,12 @@ SCIP_RETCODE printStatistic(SCIP* scip, double time, char* outputname)
        heur_hdlr = SCIPfindHeur(scip, "aleatoria");
        fprintf(fout, ";%lf;%lld;%lld;%lld;%s",SCIPheurGetTime(heur_hdlr),SCIPheurGetNCalls(heur_hdlr), SCIPheurGetNSolsFound(heur_hdlr), SCIPheurGetNBestSolsFound(heur_hdlr), SCIPheurGetName(heur_hdlr));
     }
+
+    // incluindo a heurista do grasp para mochila multipla
+    if(param.heur_grasp){
+      heur_hdlr = SCIPfindHeur(scip, "grasp");
+      fprintf(fout, ";%lf;%lld;%lld;%lld;%s",SCIPheurGetTime(heur_hdlr),SCIPheurGetNCalls(heur_hdlr), SCIPheurGetNSolsFound(heur_hdlr), SCIPheurGetNBestSolsFound(heur_hdlr), SCIPheurGetName(heur_hdlr));
+    }
     
     fprintf(fout, ";%s\n", param.parameter_stamp);
   }
@@ -138,6 +146,10 @@ SCIP_RETCODE configScip(
    // active heuristic aleatoria
    if(param.heur_aleatoria)
      SCIP_CALL( SCIPincludeHeurAleatoria(scip) );
+    // ativa a heuristica do grasp
+    /*if(param.heur_grasp){
+      SCIP_CALL( SCIPincludeHeurGrasp(scip) );
+    }*/
    
    *pscip = scip;
    return SCIP_OKAY;
@@ -172,7 +184,9 @@ int setParameters(int argc, char** argv, parametersT* pparam)
             {"heur round freq", "--heur_round_freq", &(param.heur_round_freq), INT, 0,MAXINT,0,0,1,0},
             {"heur round maxdepth", "--heur_round_depth", &(param.heur_round_maxdepth), INT, -1,MAXINT,0,0,-1,0},
             {"heur round freqofs", "--heur_round_freqofs", &(param.heur_round_freqofs), INT, 0,MAXINT,0,0,0,0},
-            {"heur aleatoria", "--heur_aleatoria", &(param.heur_aleatoria), INT, 0,1,0,0,0,0}
+            {"heur aleatoria", "--heur_aleatoria", &(param.heur_aleatoria), INT, 0,1,0,0,0,0},
+            {"heur grasp", "--heur_grasp", &(param.heur_grasp), INT, 0,1,0,0,0,0}   // eu quem adicionei essa linha
+
   };
   int i, j, ivalue, error;
   double dvalue;

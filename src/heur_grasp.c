@@ -33,7 +33,7 @@
 /* configuracao da heuristica */
 #define HEUR_NAME             "grasp"
 #define HEUR_DESC             "primal heuristic template"
-#define HEUR_DISPCHAR         'r'
+#define HEUR_DISPCHAR         'g'
 #define HEUR_PRIORITY         3 /* comeca pelas heuristicas de maior prioridade */
 #define HEUR_FREQ             1 /* a cada 1 nivel da arvore de B&B */
 #define HEUR_FREQOFS          0 /* comecando do nivel 0 */
@@ -130,7 +130,7 @@ void cria_RCL(itemType *candidatos, itemType *RCL, int minimo, int maximo, int a
 
 int numero_aleatorio(int n_cand);  // funcao que gera um numero aleatorio entre 0 e o numero de valores no vetor de candidatos
 
-void atualiza_candidatos(itemType *candidatos, int *n_cand, int capacidade_atual);
+void atualiza_candidatos(itemType *candidatos, int *n_cand, int capacidade_atual, int posicao_item_escolhido);
 
 /**
  * @brief Core of the grasp heuristic: it builds one solution for the problem by grasp procedure.
@@ -210,7 +210,6 @@ int grasp(SCIP* scip, SCIP_SOL** sol, SCIP_HEUR* heur)
 
    // alocando o vetor de candidatos
    candidatos = (itemType*) malloc(sizeof(itemType)*I->n);
-   RCL = (itemType*) malloc(sizeof(itemType)*I->n);
 
     for( i = 0; i < max_iteracoes; i++){
 
@@ -226,33 +225,36 @@ int grasp(SCIP* scip, SCIP_SOL** sol, SCIP_HEUR* heur)
 
       int  capacidade_atual = I->C[i];
 
-      while(capacidade_atual < 0.0 && n_cand >= 1){
+      while(capacidade_atual > 0.0 && n_cand >= 1){
 
          // maximo e o minimo de candidatos[i];
          min_max(candidatos, n, &maximo, &minimo);
 
          // cria a RCL
-         cria_RCL(candidatos, RCL, minimo, maximo, alpha, I->n, &n_RCL);
-
+         RCL = (itemType*) malloc(sizeof(itemType)*I->n);
+         if(RCL){
+            cria_RCL(candidatos, RCL, minimo, maximo, alpha, I->n, &n_RCL);
+         }else{
+            break;
+         }
 
          // escolhe um item aleatorio da RCL
          posicao_item_escolhido = numero_aleatorio(n_RCL);
 
+         // atualzia o custo e diminui a capacidade atual da mochila
          custo += RCL[posicao_item_escolhido].value;
          capacidade_atual -= RCL[posicao_item_escolhido].weight;
 
          // atualizar a lista de candidatos
-
-         // 1° "remover" o item que foi escolhido
-         candidatos[posicao_item_escolhido] = candidatos[--n_cand];
+         atualiza_candidatos(candidatos, &n_cand, capacidade_atual, posicao_item_escolhido);
          
-
+         // apagando a RCL
+         free(RCL);
       }
 
       free(candidatos);
 
     }
-
 
    // first, select all variables already fixed in 1.0
    for(i=0;i<nvars;i++){
@@ -487,10 +489,23 @@ int numero_aleatorio(int n_cand){
    return rand() % n_cand;
 }
 
-void atualiza_candidatos(itemType *candidatos, int *n_cand, int capacidade_atual){
+void atualiza_candidatos(itemType *candidatos, int *n_cand, int capacidade_atual, int posicao_item_escolhido){
+   // 1° "remover" o item que foi escolhido
+    candidatos[posicao_item_escolhido] = candidatos[--(*n_cand)]; // coloco o ultimo na posicao do item escolhido e diminuo a quant de itens
 
-   for(int i = 0; i < n_cand; i++){
-      if(candidatos[i].weight <= capacidade_atual){
+   // removendo da lista todos os itens que possuem peso > capacidade atual da mochila
+   for(int i = 0; i < *n_cand; i++){
+
+      // se isso acontecer, eu preciso remover esse item
+      if(candidatos[i].weight > capacidade_atual){
+
+         while(candidatos[(*n_cand)-1].weight > capacidade_atual && *n_cand > i){
+            (*n_cand) -= 1;
+         }
+
+         if(*n_cand > i){
+            candidatos[i] = candidatos[--(*n_cand)];
+         }
 
       }
    }
