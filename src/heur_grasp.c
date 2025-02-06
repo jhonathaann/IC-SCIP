@@ -39,7 +39,7 @@
 #define HEUR_FREQOFS          0 /* comecando do nivel 0 */
 #define HEUR_MAXDEPTH         10 /* nivel max para chamar a heuristica. -1 = sem limites */
 #define HEUR_TIMING           SCIP_HEURTIMING_AFTERNODE //SCIP_HEURTIMING_DURINGLPLOOP // SCIP_HEURTIMING_AFTERNODE /* chamado depois que o LP resolvido */
-#define HEUR_USESSUBSCIP      TRUE  /**< does the heuristic use a secondary SCIP instance? */
+#define HEUR_USESSUBSCIP      FALSE  /**< does the heuristic use a secondary SCIP instance? */
 
 #ifdef DEBUG
    #define PRINTF(...) printf(__VA_ARGS__)
@@ -124,13 +124,15 @@ SCIP_DECL_HEUREXITSOL(heurExitsolGrasp)
    return SCIP_OKAY;
 }
 
-void min_max(itemType *candidatos, int n, int *max, int *min);  // funcao para achar o maximo e o minimo  da lista de candidatos
+void min_max(itemType *candidatos, int n, int *max, int *min);
 
-void cria_RCL(itemType *candidatos, itemType *RCL, int minimo, int maximo, int alpha, int n, int *n_RCL);   // funcao para criar a RCL. eesa funcao "retorna", alem da RCL, o numero de elementos que ela tem
+void cria_RCL(itemType *candidatos, itemType *RCL, int minimo, int maximo, int alpha, int n, int *n_RCL);
 
-int numero_aleatorio(int n_cand);  // funcao que gera um numero aleatorio entre 0 e o numero de valores no vetor de candidatos
+int numero_aleatorio(int n_cand);
 
-void atualiza_candidatos(itemType *candidatos, int *n_cand, int capacidade_atual, int posicao_item_escolhido);
+void atualiza_candidatos(itemType *candidatos, int rotulo, int *n_cand, int capacidade_atual);
+
+int verifica_solucao(solucao *itens_solucao, int label, int n);
 
 /**
  * @brief Core of the grasp heuristic: it builds one solution for the problem by grasp procedure.
@@ -145,7 +147,7 @@ int grasp(SCIP* scip, SCIP_SOL** sol, SCIP_HEUR* heur)
    int found, infeasible, nInSolution;
    unsigned int stored;
    int nvars;
-   int *covered, n, custo, *cand, nCands, selected, s;
+   int *covered, n, m, custo, *cand, nCands, selected, s;
    SCIP_VAR *var, **solution, **varlist;
    //  SCIP* scip_cp;
    SCIP_Real valor, bestUb;
@@ -153,10 +155,11 @@ int grasp(SCIP* scip, SCIP_SOL** sol, SCIP_HEUR* heur)
    int i, residual;
    instanceT* I;
 
-
-   int max_iteracoes = 10, maximo, minimo, alpha, n_cand = 0;
-   int posicao_item_escolhido, n_RCL;
    itemType *candidatos, *RCL;
+   solucao *itens_solucao;
+
+   int max_iteracoes, maximo, minimo, alpha = 0.7, n_cand = 0;
+   int posicao_item_escolhido, n_RCL = 0, rotulo, n_solucao;
    
    found = 0;
    infeasible = 0;
@@ -173,6 +176,7 @@ int grasp(SCIP* scip, SCIP_SOL** sol, SCIP_HEUR* heur)
    varlist = SCIPprobdataGetVars(probdata);
    I = SCIPprobdataGetInstance(probdata);
    n = I->n;
+   m = I->m;
     
    solution = (SCIP_VAR**) malloc(sizeof(SCIP_VAR*)*n);
    covered = (int*) calloc(n,sizeof(int));
@@ -181,80 +185,6 @@ int grasp(SCIP* scip, SCIP_SOL** sol, SCIP_HEUR* heur)
    nInSolution = 0;
    custo = 0;
    residual = I->C[0];
-
-   /* GRASP
-    A LISTA DE CANDIDATOS TERA QUE SER UMA MATRIZ (?), onde a primeira linha sao todos os itens que tem peso <= capacidade da mochila 1
-    PRECISO TABM TER UM VETOR COM AS CAPACIDADES ATUAIS DE CADA MOCHILA
-
-     for(int i = 0; i < max_iteracoes; i++){
-
-            primeiro eu tenho que criar a lista de candidatos (todos os itens que possuem peso <= capacidade de alguma mochila)
-
-            while(capacidade_atual[i] > 0.0 and candidatos[i] != NULL){
-                encontrar o maximo e o minimo de candidatos[i]
-
-                cria a RCL com os candidatos[i]
-
-                escolhe um item aleatorio dessa RCL e coloca na solucao
-
-                // atualizar a lista de candidatos
-            
-            }
-
-            // apago a lista de 
-    
-        }
-    
-
-    */
-
-   // alocando o vetor de candidatos
-   candidatos = (itemType*) malloc(sizeof(itemType)*I->n);
-
-    for( i = 0; i < max_iteracoes; i++){
-
-      // colocando no vetor candidatos todos os itens que tem peso <= capacidade da mochila i
-      for(int j = 0; j < I->n; j++){
-         if(I->item[j].weight <= I->C[i]){
-            candidatos[j] = I->item[j];  // assim?
-            n_cand++;
-         }
-      }
-
-      // a partir daqui, candidatos possui todos os itens com peso <= capacidade da mochila i
-
-      int  capacidade_atual = I->C[i];
-
-      while(capacidade_atual > 0.0 && n_cand >= 1){
-
-         // maximo e o minimo de candidatos[i];
-         min_max(candidatos, n, &maximo, &minimo);
-
-         // cria a RCL
-         RCL = (itemType*) malloc(sizeof(itemType)*I->n);
-         if(RCL){
-            cria_RCL(candidatos, RCL, minimo, maximo, alpha, I->n, &n_RCL);
-         }else{
-            break;
-         }
-
-         // escolhe um item aleatorio da RCL
-         posicao_item_escolhido = numero_aleatorio(n_RCL);
-
-         // atualzia o custo e diminui a capacidade atual da mochila
-         custo += RCL[posicao_item_escolhido].value;
-         capacidade_atual -= RCL[posicao_item_escolhido].weight;
-
-         // atualizar a lista de candidatos
-         atualiza_candidatos(candidatos, &n_cand, capacidade_atual, posicao_item_escolhido);
-         
-         // apagando a RCL
-         free(RCL);
-      }
-
-      free(candidatos);
-
-    }
 
    // first, select all variables already fixed in 1.0
    for(i=0;i<nvars;i++){
@@ -281,6 +211,57 @@ int grasp(SCIP* scip, SCIP_SOL** sol, SCIP_HEUR* heur)
         }
       }
    }
+
+   // alocando o vetor de itens que foram colocados na solucao
+   itens_solucao = (solucao *) malloc(sizeof(solucao)*n);
+   max_iteracoes = m;
+   // quantidade de iteracoes = quantidade de mochilas q eu tenho
+    for( i = 0; i < max_iteracoes; i++){
+      candidatos = (itemType*) malloc(sizeof(itemType)*I->n);  // alocando o vetor de candidatos
+
+      for (int j = 0; j < n; j++){
+         // colocando no vetor candidatos todos os itens que tem peso <= capacidade da mochila i E que nao foram colocados ainda na solucao
+         if (I->item[j].weight <= I->C[i] && (verifica_solucao(itens_solucao, I->item[j].label, n_solucao) == 0))
+         {
+            candidatos[n_cand].label = I->item[j].label; // assim?
+            candidatos[n_cand].weight = I->item[j].weight;
+            candidatos[n_cand].value = I->item[j].value;
+            n_cand++;
+         }
+      }
+
+      // a partir daqui, candidatos possui todos os itens com peso <= capacidade da mochila i
+
+      int  capacidade_atual = I->C[i];
+
+      while(capacidade_atual > 0.0 && n_cand >= 1){
+         min_max(candidatos, n_cand, &maximo, &minimo);
+         RCL = (itemType*) malloc(sizeof(itemType)*I->n);
+         cria_RCL(candidatos, RCL, minimo, maximo, alpha, n_cand, &n_RCL);
+
+         posicao_item_escolhido = numero_aleatorio(n_RCL);
+         rotulo = RCL[posicao_item_escolhido].label;
+
+         // atualzia o custo e diminui a capacidade atual da mochila
+         custo += RCL[posicao_item_escolhido].value;
+         capacidade_atual -= RCL[posicao_item_escolhido].weight;
+
+         custo += RCL[posicao_item_escolhido].value;
+
+         capacidade_atual -= RCL[posicao_item_escolhido].weight;
+         itens_solucao[n_solucao].label = RCL[posicao_item_escolhido].label;
+         itens_solucao[n_solucao].mochila = i+1;
+         n_solucao++;
+
+         atualiza_candidatos(candidatos, rotulo, &n_cand, capacidade_atual);
+   
+         free(RCL);
+      }
+
+      free(candidatos);
+
+    }
+
 
 
    // complete solution using items not fixed (not covered)
@@ -406,7 +387,6 @@ SCIP_DECL_HEUREXEC(heurExecGrasp)
    return SCIP_OKAY;
 }
 
-
 /*
  * primal heuristic specific interface methods
  */
@@ -458,28 +438,37 @@ SCIP_RETCODE SCIPincludeHeurGrasp(
    return SCIP_OKAY;
 }
 
-void min_max(itemType *candidatos, int n, int *max, int *min){
-   max = candidatos[0].value;
-   min = candidatos[0].value;
+void min_max(itemType *candidatos, int n, int *max, int *min)
+{
+   *max = candidatos[0].value;
+   *min = candidatos[0].value;
 
-   for(int i = 1; i < n; i++){
-      if(candidatos[i].value > *max){
+   for (int i = 1; i < n; i++)
+   {
+      if (candidatos[i].value >= *max)
+      {
          *max = candidatos[i].value;
       }
 
-       if(candidatos[i].value < *min){
+      if (candidatos[i].value <= *min)
+      {
+         
          *min = candidatos[i].value;
       }
    }
 
 }
 
-void cria_RCL(itemType *candidatos, itemType *RCL, int minimo, int maximo, int alpha, int n, int *n_RCL){
-   
-   for(int i = 0; i < n; i++){
+void cria_RCL(itemType *candidatos, itemType *RCL, int minimo, int maximo, int alpha, int n, int *n_RCL)
+{
 
-      if(candidatos[i].value >= minimo + alpha * (maximo - minimo)){
-         RCL[*n_RCL] = candidatos[*n_RCL];
+   for (int i = 0; i < n; i++)
+   {
+      if (candidatos[i].value >= minimo + alpha * (maximo - minimo))
+      {
+         RCL[*n_RCL].label = candidatos[i].label;
+         RCL[*n_RCL].weight = candidatos[i].weight;
+         RCL[*n_RCL].value = candidatos[i].value;
          (*n_RCL) += 1;
       }
    }
@@ -489,24 +478,45 @@ int numero_aleatorio(int n_cand){
    return rand() % n_cand;
 }
 
-void atualiza_candidatos(itemType *candidatos, int *n_cand, int capacidade_atual, int posicao_item_escolhido){
-   // 1° "remover" o item que foi escolhido
-    candidatos[posicao_item_escolhido] = candidatos[--(*n_cand)]; // coloco o ultimo na posicao do item escolhido e diminuo a quant de itens
+void atualiza_candidatos(itemType *candidatos, int rotulo, int *n_cand, int capacidade_atual)
+{
 
-   // removendo da lista todos os itens que possuem peso > capacidade atual da mochila
    for(int i = 0; i < *n_cand; i++){
+      if(candidatos[i].label == rotulo){
+         candidatos[i] = candidatos[--(*n_cand)];
+      }
+   }
+
+   for (int i = 0; i < *n_cand; i++)
+   {
 
       // se isso acontecer, eu preciso remover esse item
-      if(candidatos[i].weight > capacidade_atual){
+      if (candidatos[i].weight > capacidade_atual)
+      {
 
-         while(candidatos[(*n_cand)-1].weight > capacidade_atual && *n_cand > i){
+         while (candidatos[(*n_cand) - 1].weight > capacidade_atual && *n_cand > i)
+         {
             (*n_cand) -= 1;
          }
 
-         if(*n_cand > i){
+         if (*n_cand > i)
+         {
             candidatos[i] = candidatos[--(*n_cand)];
          }
-
       }
    }
+
+}
+
+int verifica_solucao(solucao *itens_solucao, int label, int n){
+   if(n == 0){
+      return 0;
+   }else{
+      for(int i = 0; i < n; i++){
+         if(itens_solucao[i].label == label){
+            return 1;
+         }
+      }
+   }
+   return 0; 
 }

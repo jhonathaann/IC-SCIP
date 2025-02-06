@@ -37,7 +37,7 @@
 #define HEUR_FREQOFS          0 /* comecando do nivel 0 */
 #define HEUR_MAXDEPTH         10 /* nivel max para chamar a heuristica. -1 = sem limites */
 #define HEUR_TIMING           SCIP_HEURTIMING_AFTERNODE //SCIP_HEURTIMING_DURINGLPLOOP // SCIP_HEURTIMING_AFTERNODE /* chamado depois que o LP resolvido */
-#define HEUR_USESSUBSCIP      TRUE  /**< does the heuristic use a secondary SCIP instance? */
+#define HEUR_USESSUBSCIP      FALSE  /**< does the heuristic use a secondary SCIP instance? */
 
 #ifdef DEBUG
    #define PRINTF(...) printf(__VA_ARGS__)

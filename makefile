@@ -4,8 +4,8 @@ TRACE=NDEBUG
 LDFLAGS=
 CFLAGS=-g -std=c11 -Wall -D$(TRACE) -D SCIP_VERSION_MAJOR
 
-bin/mochila: bin/cmain.o bin/probdata_mochila.o bin/problem.o bin/heur_problem.o bin/heur_myrounding.o  bin/heur_aleatoria.o
-	gcc -o bin/mochila-$(TRACE) bin/cmain.o bin/probdata_mochila.o bin/problem.o bin/heur_problem.o bin/heur_myrounding.o bin/heur_aleatoria.o -lscip -lm
+bin/mochila: bin/cmain.o bin/probdata_mochila.o bin/problem.o bin/heur_problem.o bin/heur_myrounding.o  bin/heur_aleatoria.o bin/heur_grasp.o
+	gcc -o bin/mochila-$(TRACE) bin/cmain.o bin/probdata_mochila.o bin/problem.o bin/heur_problem.o bin/heur_myrounding.o bin/heur_aleatoria.o bin/heur_grasp.o -lscip -lm
 
 bin/cmain.o: src/cmain.c
 	gcc $(LDFLAGS) $(CFLAGS) -c -o bin/cmain.o src/cmain.c
@@ -24,6 +24,9 @@ bin/heur_myrounding.o: src/heur_myrounding.c src/heur_myrounding.h
 
 bin/heur_aleatoria.o: src/heur_aleatoria.c src/heur_aleatoria.h
 	gcc $(LDFLAGS) $(CFLAGS) -c -o bin/heur_aleatoria.o src/heur_aleatoria.c
+
+bin/heur_grasp.o: src/heur_grasp.c src/heur_grasp.h
+	gcc $(LDFLAGS) $(CFLAGS) -c -o bin/heur_grasp.o src/heur_grasp.c
 
 .PHONY: clean
 

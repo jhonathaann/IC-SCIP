@@ -147,9 +147,9 @@ SCIP_RETCODE configScip(
    if(param.heur_aleatoria)
      SCIP_CALL( SCIPincludeHeurAleatoria(scip) );
     // ativa a heuristica do grasp
-    /*if(param.heur_grasp){
+    if(param.heur_grasp){
       SCIP_CALL( SCIPincludeHeurGrasp(scip) );
-    }*/
+    }
    
    *pscip = scip;
    return SCIP_OKAY;
@@ -172,7 +172,7 @@ int setParameters(int argc, char** argv, parametersT* pparam)
     double ddefault;    
   } settingsT;
 
-  enum {time_limit,display_freq,nodes_limit,param_stamp, param_output_path, heur_rounding, heur_round_freq, heur_round_depth, heur_round_freqofs, heur_aleatoria, total_parameters};
+  enum {time_limit,display_freq,nodes_limit,param_stamp, param_output_path, heur_rounding, heur_round_freq, heur_round_depth, heur_round_freqofs, heur_aleatoria, heur_grasp, total_parameters};
 
   settingsT parameters[]={
             {"time limit", "--time", &(param.time_limit), INT, 0, 7200, 0,0,1800,0},

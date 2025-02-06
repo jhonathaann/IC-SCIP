@@ -29,6 +29,12 @@
 
 #include "scip/scip.h"
 
+// struct para guardar uma solucao
+typedef struct
+{
+   int label, mochila;
+}solucao;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
