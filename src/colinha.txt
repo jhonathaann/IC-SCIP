@@ -1,0 +1,198 @@
+ // complete solution using items not fixed (not covered)
+   for(i=0;i<n && nCovered < n && residual>0;i++){
+     // only select actived var in scip and whose gulosa up is valid for the problem
+     if(!covered[i] && I->item[i].weight <= residual){
+       var = varlist[i];
+       // include selected var in the solution
+       solution[nInSolution++]=var;
+        // update residual capacity
+        residual -= I->item[i].weight;
+       // update vertex covered by the current solution
+       covered[i] = 1;
+       nCovered++;
+       custo += I->item[i].value;
+       infeasible = residual<0?1:0;
+
+
+       ========================================================================================================================
+
+
+int grasp(SCIP* scip, SCIP_SOL** sol, SCIP_HEUR* heur)
+{
+   int found, infeasible, nInSolution;
+   unsigned int stored;
+   int nvars;
+   int *covered, n, m, custo, *cand, nCands;
+   SCIP_VAR *var, **solution, **varlist;
+   //  SCIP* scip_cp;
+   SCIP_Real  bestUb;
+   SCIP_PROBDATA* probdata;
+   int i, residual;
+   instanceT* I;
+
+   itemType *candidatos, *RCL;
+   solucao *itens_solucao;
+
+   int max_iteracoes, maximo, minimo, alpha = 0.7;
+   int posicao_item_escolhido, n_RCL = 0, rotulo, n_solucao;
+   
+   found = 0;
+   infeasible = 0;
+   
+#ifdef DEBUG_GRASP
+   printf("\n============== New grasp heur at node: %lld\n", SCIPnodeGetNumber(SCIPgetCurrentNode(scip)));
+#endif
+
+   /* recupera os dados do problema original*/
+   probdata=SCIPgetProbData(scip);
+   assert(probdata != NULL);
+
+   nvars = SCIPprobdataGetNVars(probdata);
+   varlist = SCIPprobdataGetVars(probdata);
+   I = SCIPprobdataGetInstance(probdata);
+   n = I->n;
+   m = I->m;
+    
+   solution = (SCIP_VAR**) malloc(sizeof(SCIP_VAR*)*n);
+   covered = (int*) calloc(n,sizeof(int));
+   cand = (int*) malloc(n*sizeof(int));
+   nCands = 0;
+   nInSolution = 0;
+   custo = 0;
+   residual = I->C[0];
+
+   // first, select all variables already fixed in 1.0
+   for(i=0;i<nvars;i++){
+      var = varlist[i];
+      if(SCIPvarGetLbLocal(var) > 1.0 - EPSILON){ // var >= 1.0
+        solution[nInSolution++]=var;
+        // update residual capacity
+        residual -= I->item[i].weight;
+        covered[i]=1;
+        // update solution value
+        custo += I->item[i].value;
+        infeasible = residual < 0?1:0;
+#ifdef DEBUG_GRASP
+        printf("\nSelected fixed var= %s. TotalItems=%d value=%d residual=%d infeasible=%d", SCIPvarGetName(var), nInSolution, custo, residual, infeasible);
+#endif
+      }
+      else{ // discard items fixed in 0.0
+        if(SCIPvarGetUbLocal(var) < EPSILON){ // var fixed in 0.0
+        }
+        else{
+          if (i < n){ // include item i in cand list
+           cand[nCands++]=i;
+          }
+        }
+      }
+   }
+
+
+   // alocando o vetor de itens que foram colocados na solucao
+   itens_solucao = (solucao *) malloc(sizeof(solucao)*n);
+   max_iteracoes = m;
+
+   // quantidade de iteracoes = quantidade de mochilas q eu tenho (?)
+    for( i = 0; i < max_iteracoes; i++){
+      candidatos = (itemType*) malloc(sizeof(itemType)*I->n);  // alocando o vetor de candidatos
+
+      for (int j = 0; j < n && nCands < n; j++){
+
+         // colocando no vetor candidatos todos os itens que tem peso <= capacidade da mochila i E que nao foram colocados ainda na solucao E que nao foram cobertos
+         if (I->item[j].weight <= I->C[i] && (verifica_solucao(itens_solucao, I->item[j].label, n_solucao) == 0) && !covered[j])
+         {
+            candidatos[nCands].label = I->item[j].label; // assim?
+            candidatos[nCands].weight = I->item[j].weight;
+            candidatos[nCands].value = I->item[j].value;
+            nCands++;
+         }
+      }
+
+      // a partir daqui, candidatos possui todos os itens com peso <= capacidade da mochila i
+
+      int  capacidade_atual = I->C[i];
+
+      while(capacidade_atual > 0.0 && nCands >= 1){
+         min_max(candidatos, nCands, &maximo, &minimo);
+         RCL = (itemType*) malloc(sizeof(itemType)*I->n);
+         cria_RCL(candidatos, RCL, minimo, maximo, alpha, nCands, &n_RCL);
+
+         posicao_item_escolhido = numero_aleatorio(n_RCL);
+         rotulo = RCL[posicao_item_escolhido].label;
+
+         var = varlist[rotulo];
+         solution[nInSolution++] = var;
+         covered[rotulo] = 1;
+         nCands++;
+         
+
+         // atualzia o custo e diminui a capacidade atual da mochila corrente
+         custo += RCL[posicao_item_escolhido].value;
+         capacidade_atual -= RCL[posicao_item_escolhido].weight;
+
+         itens_solucao[n_solucao].label = RCL[posicao_item_escolhido].label;
+         itens_solucao[n_solucao].mochila = i+1;
+         n_solucao++;
+
+         atualiza_candidatos(candidatos, rotulo, &nCands, capacidade_atual);
+   
+         free(RCL);
+
+         infeasible = capacidade_atual< 0 ? 1 :0;
+      }
+
+      free(candidatos);
+
+    }
+
+   if(!infeasible){
+      /* create SCIP solution structure sol */
+      SCIP_CALL( SCIPcreateSol(scip, sol, heur) );
+      // save found solution in sol
+      for(i=0;i<nInSolution;i++){
+         var = solution[i];
+         SCIP_CALL( SCIPsetSolVal(scip, *sol, var, 1.0) );
+      }
+      bestUb = SCIPgetPrimalbound(scip);
+#ifdef DEBUG_GRASP
+      printf("\nFound solution...\n");
+      //      SCIP_CALL( SCIPprintSol(scip, *sol, NULL, FALSE) );
+      printf("\ninfeasible=%d value = %lf > bestUb = %lf? %d\n\n", infeasible, valor, bestUb, valor > bestUb + EPSILON);
+#endif
+      if(!infeasible && custo > bestUb + EPSILON){
+#ifdef DEBUG_GRASP
+         printf("\nBest solution found...\n");
+         SCIP_CALL( SCIPprintSol(scip, *sol, NULL, FALSE) );
+#endif
+         
+         /* verificar se a solucao eh viavel e armazena */
+         SCIP_CALL( SCIPtrySolMine(scip, *sol, TRUE, TRUE, FALSE, TRUE, &stored) );
+         if( stored )
+         {
+#ifdef DEBUG_PRIMAL
+            printf("\nSolution is feasible and was saved! Total of items = %d", nInSolution);
+            SCIPdebugMessage("found feasible GRASP solution:\n");
+            SCIP_CALL( SCIPprintSol(scip, *sol, NULL, FALSE) );
+#endif
+            found = 1;
+         }
+         else{
+           found = 0;
+#ifdef DEBUG_GRASP
+           printf("\nCould not found\n. BestUb=%lf", bestUb);
+#endif
+         }
+      }
+   }
+#ifdef DEBUG_GRASP
+   getchar();
+#endif
+   free(varlist);
+   free(solution);
+   free(covered);
+   free(cand);
+   return found;
+
+
+   // =============== FIM DA FUNCAO DA HEURISTICA
+}

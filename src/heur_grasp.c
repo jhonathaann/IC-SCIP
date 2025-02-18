@@ -146,7 +146,7 @@ int grasp(SCIP* scip, SCIP_SOL** sol, SCIP_HEUR* heur)
 {
    int found, infeasible, nInSolution;
    unsigned int stored;
-   int nvars;
+  int nvars;
    int *covered, n, m, custo, *cand, nCands, selected, s;
    SCIP_VAR *var, **solution, **varlist;
    //  SCIP* scip_cp;
@@ -172,7 +172,7 @@ int grasp(SCIP* scip, SCIP_SOL** sol, SCIP_HEUR* heur)
    probdata=SCIPgetProbData(scip);
    assert(probdata != NULL);
 
-   nvars = SCIPprobdataGetNVars(probdata);
+   //nvars = SCIPprobdataGetNVars(probdata);
    varlist = SCIPprobdataGetVars(probdata);
    I = SCIPprobdataGetInstance(probdata);
    n = I->n;
@@ -246,9 +246,6 @@ int grasp(SCIP* scip, SCIP_SOL** sol, SCIP_HEUR* heur)
          custo += RCL[posicao_item_escolhido].value;
          capacidade_atual -= RCL[posicao_item_escolhido].weight;
 
-         custo += RCL[posicao_item_escolhido].value;
-
-         capacidade_atual -= RCL[posicao_item_escolhido].weight;
          itens_solucao[n_solucao].label = RCL[posicao_item_escolhido].label;
          itens_solucao[n_solucao].mochila = i+1;
          n_solucao++;
@@ -261,8 +258,6 @@ int grasp(SCIP* scip, SCIP_SOL** sol, SCIP_HEUR* heur)
       free(candidatos);
 
     }
-
-
 
    // complete solution using items not fixed (not covered)
    while(nCands > 0 && residual>0){
