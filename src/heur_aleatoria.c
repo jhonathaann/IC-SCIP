@@ -21,6 +21,7 @@
 /*---+----1----+----2----+----3----+----4----+----5----+----6----+----7----+----8----+----9----+----0----+----1----+----2*/
 
 #include <assert.h>
+#include <time.h>
 
 #include "probdata_mochila.h"
 #include "parameters_mochila.h"
@@ -31,11 +32,11 @@
 /* configuracao da heuristica */
 #define HEUR_NAME             "aleatoria"
 #define HEUR_DESC             "primal heuristic template"
-#define HEUR_DISPCHAR         'r'
+#define HEUR_DISPCHAR         'a'
 #define HEUR_PRIORITY         3 /* comeca pelas heuristicas de maior prioridade */
 #define HEUR_FREQ             1 /* a cada 1 nivel da arvore de B&B */
 #define HEUR_FREQOFS          0 /* comecando do nivel 0 */
-#define HEUR_MAXDEPTH         10 /* nivel max para chamar a heuristica. -1 = sem limites */
+#define HEUR_MAXDEPTH         -1 /* nivel max para chamar a heuristica. -1 = sem limites */
 #define HEUR_TIMING           SCIP_HEURTIMING_AFTERNODE //SCIP_HEURTIMING_DURINGLPLOOP // SCIP_HEURTIMING_AFTERNODE /* chamado depois que o LP resolvido */
 #define HEUR_USESSUBSCIP      FALSE  /**< does the heuristic use a secondary SCIP instance? */
 
@@ -122,6 +123,11 @@ SCIP_DECL_HEUREXITSOL(heurExitsolAleatoria)
    return SCIP_OKAY;
 }
 
+static int numero_aleatorio(int n_cand){
+   return rand() % n_cand;
+}
+
+
 
 /**
  * @brief Core of the aleatoria heuristic: it builds one solution for the problem by aleatoria procedure.
@@ -136,12 +142,12 @@ int aleatoria(SCIP* scip, SCIP_SOL** sol, SCIP_HEUR* heur)
    int found, infeasible, nInSolution;
    unsigned int stored;
    int nvars;
-   int *covered, n, custo, *cand, nCands, selected, s;
+   int *covered, n, m, nCovered = 0, custo, **cand, *nCands, s;
    SCIP_VAR *var, **solution, **varlist;
    //  SCIP* scip_cp;
    SCIP_Real valor, bestUb;
    SCIP_PROBDATA* probdata;
-   int i, residual;
+   int i, *residual;
    instanceT* I;
    
    found = 0;
@@ -159,24 +165,46 @@ int aleatoria(SCIP* scip, SCIP_SOL** sol, SCIP_HEUR* heur)
    varlist = SCIPprobdataGetVars(probdata);
    I = SCIPprobdataGetInstance(probdata);
    n = I->n;
+   m = I->m;
+
+   // print ordered items
+   printf("\nGULOSA: Ordered items by value/weight\n");
+   for(i=0;i<n;i++){
+     printf("\nGULOSA: Item %d: value=%d weight=%d value/weight=%lf", I->item[i].label, I->item[i].value, I->item[i].weight, (double) I->item[i].value/I->item[i].weight);
+     SCIPprintVar(scip, varlist[i], NULL);
+     printf("\n%f\n", SCIPvarGetLbLocal(varlist[i]));
+   }
+   
     
    solution = (SCIP_VAR**) malloc(sizeof(SCIP_VAR*)*n);
    covered = (int*) calloc(n,sizeof(int));
-   cand = (int*) malloc(n*sizeof(int));
-   nCands = 0;
+   cand = (int**) malloc(m*sizeof(int*));
+
+   for(int k = 0; k < m; k++){
+      cand[k] = (int *) malloc(n*sizeof(int));
+   }
+
+   residual = (int *) malloc(m*sizeof(int));
+   nCands = (int *) calloc(m,sizeof(int));  // inicializa todas as posicoes com 0
+
+
+   for(int k = 0; k < m; k++){
+      residual[k] = I->C[k];
+   }
+
    nInSolution = 0;
    custo = 0;
-   residual = I->C[0];
-
+   
    // first, select all variables already fixed in 1.0
-   for(i=0;i<nvars;i++){
+  for(i=0;i<nvars;i++){
       var = varlist[i];
+      
       if(SCIPvarGetLbLocal(var) > 1.0 - EPSILON){ // var >= 1.0
         solution[nInSolution++]=var;
-        // update residual capacity
-        residual -= I->item[i].weight;
-        covered[i]=1;
-        // update solution value
+        //exit(0);
+        residual[i%m] -= I->item[i].weight;
+        covered[i%n]=1;
+        nCovered++;
         custo += I->item[i].value;
         infeasible = residual < 0?1:0;
 #ifdef DEBUG_ALEATORIA
@@ -186,42 +214,68 @@ int aleatoria(SCIP* scip, SCIP_SOL** sol, SCIP_HEUR* heur)
       else{ // discard items fixed in 0.0
         if(SCIPvarGetUbLocal(var) < EPSILON){ // var fixed in 0.0
         }
+
         else{
           if (i < n){ // include item i in cand list
-           cand[nCands++]=i;
+            for(int k = 0; k < m; k++){
+
+               if(I->item[i].weight <= residual[k]){
+                  cand[k][nCands[k]] = i;
+                  nCands[k] += 1;
+               }
+            }
           }
         }
       }
    }
+   int residual_atual;
+
    // complete solution using items not fixed (not covered)
-   while(nCands > 0 && residual>0){
-      s = randomIntegerB (0, nCands-1);
-      selected = cand[s]; // selected candidate
-      cand[s] = cand[--nCands]; // remove selected candidate
-      // only accept the item if not covered yet and not exceed the capacity
-      if(!covered[selected] && I->item[selected].weight <= residual){
-         // compute the real value
-         valor = I->item[selected].value;
-         var = varlist[selected];
-         // include selected var in the solution
-         solution[nInSolution++]=var;
-         // update residual capacity
-         residual -= I->item[selected].weight;
-         // update covered
-         covered[selected] = 1;
-         // update the solution value
-         custo += valor;
-         infeasible = residual<0?1:0;
-#ifdef DEBUG_ALEATORIA
-         printf("\n\nSelected var= %s. TotalItems=%d value item=%d value = %d residual=%d infeasible=%d\n", SCIPvarGetName(var), nInSolution, valor, custo, residual, infeasible);
-#endif
+   for(i=0; i < n && nCovered < n && nCands[i] > 0 && residual[i]>0; i++){
+      s = numero_aleatorio(n);
+      for(int j = 0; j < m; j++){
+         residual_atual =  residual[j];
+         printf("peso atual da mochila %d: %d\n", j, residual_atual);
+         
+
+         if(I->item[s].weight <= residual[i] && !covered[s]){
+            residual[i] -= I->item[s].weight;
+            covered[s] = 1;
+            printf("\nMOCHIILA: %d\nSELECIONADO: Item %d: value=%d weight=%d",j,  I->item[s].label, I->item[s].value, I->item[s].weight);
+            
+         }
+
       }
-      else{
-        // desconsidere o item
-#ifdef DEBUG_ALEATORIA
-        printf("\n\nNOT selected var= %s. TotalItems=%d value item=%d value=%d residual=%d infeasible=%d\n", SCIPvarGetName(varlist[selected]), nInSolution, valor, custo, residual, infeasible);
-#endif
-      }
+//       //s = numero_aleatorio(nCands[i]);
+//       //selected = cand[i][s];  // selecionando o candidato
+//       cand[i][s] = cand[i][nCands[i]]; // remove selected candidate
+//       nCands[i] -= 1;  // diminui a quant de candidatos que a mochila i possui
+
+//       // only accept the item if not covered yet and not exceed the capacity
+//       if(!covered[s] && I->item[s].weight <= residual[i]){
+//         // printf("\nMOCHIILA: %d\nSELECIONADO: Item %d: value=%d weight=%d",i,  I->item[s].label, I->item[s].value, I->item[s].weight);
+//          valor = I->item[s].value;  // pega o valor do item escolhido
+
+//          var = varlist[s];  // selecionando a variavel escolhida
+//          solution[nInSolution++]=var;
+
+//          residual[i] -= I->item[s].weight; // atualiza a capacidade atual da mochila i
+
+//          covered[s] = 1;     // marca o item escolhido como coberto
+//          nCovered++;
+
+//          custo += valor;    // atualiza o custo
+//          infeasible = residual<0?1:0;
+// #ifdef DEBUG_ALEATORIA
+//          printf("\n\nSelected var= %s. TotalItems=%d value item=%d value = %d residual=%d infeasible=%d\n", SCIPvarGetName(var), nInSolution, valor, custo, residual, infeasible);
+// #endif
+//       }
+//       else{
+//         // desconsidere o item
+// #ifdef DEBUG_ALEATORIA
+//         printf("\n\nNOT selected var= %s. TotalItems=%d value item=%d value=%d residual=%d infeasible=%d\n", SCIPvarGetName(varlist[selected]), nInSolution, valor, custo, residual, infeasible);
+// #endif
+//       }
    }
    if(!infeasible){
       /* create SCIP solution structure sol */

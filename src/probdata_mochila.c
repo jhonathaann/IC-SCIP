@@ -265,7 +265,7 @@ SCIP_RETCODE SCIPprobdataCreate(
   
    // alloc memory to create vars and cons - it is necessary to probdatacreate(), that will make a copy of them.
    SCIP_CALL( SCIPallocBufferArray(scip, &conss, I->m + I->n) );   // m restricoes. uma para cada mochila + n restricoes. uma para cada item (para garantir que cada item so seja colocado em uma mochila)
-   SCIP_CALL( SCIPallocBufferArray(scip, &vars, (I->n) * (I->m)) );   // alocando agr n*m variaveis ao inves de n(pq agr a variavel eh x_i_j)
+   SCIP_CALL( SCIPallocBufferArray(scip, &vars, ((I->n) * (I->m))) );   // alocando agr n*m variaveis ao inves de n(pq agr a variavel eh x_i_j)
    
    ncons=0;  // incializando o numero de restricoes do modelo
    nvars=0;  // inicializando o numero de variaveis do modelo
@@ -294,7 +294,7 @@ SCIP_RETCODE SCIPprobdataCreate(
    
    /* create one variable for each item i */
    // criando n*m variaveis, pq agr eu tenho j variaveis para cada item i
-   for( i = 0; i < I->n; nvars++, ++i )
+   for( i = 0; i < I->n; ++i )
    {
       // com esse segundo for aqui eu consigo tanto fazer a variavel ter dois indices
       // quanto colocar cada variavel i na restricao de capacidade da mochila j
@@ -308,7 +308,7 @@ SCIP_RETCODE SCIPprobdataCreate(
 
          assert(var != NULL);
          /* save the pointer to the created var */
-         vars[nvars]=var;
+         vars[nvars++]=var;
 
          /* add variable to the problem */
          SCIP_CALL( SCIPaddVar(scip, var) );
@@ -320,7 +320,10 @@ SCIP_RETCODE SCIPprobdataCreate(
          // adicionando a variaval a restricao do item i (mochila multipla).
          SCIP_CALL( SCIPaddCoefLinear(scip, conss[I->m+i], var, 1.0 ));  // item i so pode ser colocado em uma mochila
          // pulando m restricoes para assim chegar na restricao correta
+
+         //nvars++;
       }
+      //nvars++;
       
    }   
       
